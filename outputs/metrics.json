@@ -1,0 +1,7 @@
+{
+  "acc": 1.0,
+  "precision_scab": 1.0,
+  "recall_scab": 1.0,
+  "f1_scab": 1.0,
+  "epoch": 3
+}
