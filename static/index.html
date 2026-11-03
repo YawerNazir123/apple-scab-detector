@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apple Scab Detector</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --green: #1b7a3d;
+    --green-dark: #146231;
+    --bg: #f7faf5;
+    --amber: #c2410c;
+    --text: #1e293b;
+    --muted: #64748b;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 40px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 24px; }
+  header h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 6px; }
+  header .tagline { color: var(--muted); font-size: 1rem; margin-bottom: 10px; }
+  .badge {
+    display: inline-block;
+    background: #e8f5e9;
+    color: var(--green);
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  /* Drop zone */
+  #dropzone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  #dropzone:hover, #dropzone.dragover {
+    border-color: var(--green);
+    background: #f0fdf4;
+  }
+  #dropzone .icon { font-size: 2.5rem; margin-bottom: 10px; }
+  #dropzone p.main { font-weight: 600; margin-bottom: 6px; }
+  #dropzone p.sub { color: var(--muted); font-size: 0.85rem; }
+  #dropzone.error { border-color: #dc2626; background: #fef2f2; }
+  #dz-error {
+    display: none;
+    color: #dc2626;
+    font-size: 0.88rem;
+    margin-top: 10px;
+    font-weight: 500;
+  }
+  input[type=file] { display: none; }
+  /* Preview */
+  #preview-wrap { display: none; text-align: center; }
+  #preview-wrap img {
+    max-width: 100%;
+    max-height: 320px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+  #filename { color: var(--muted); font-size: 0.88rem; margin-bottom: 14px; word-break: break-all; }
+  .btn {
+    display: inline-block;
+    min-height: 44px;
+    padding: 12px 28px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .btn-primary { background: var(--green); color: #fff; }
+  .btn-primary:hover { background: var(--green-dark); }
+  .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+  .btn-text {
+    background: none;
+    color: var(--muted);
+    font-size: 0.92rem;
+    padding: 12px 16px;
+    text-decoration: underline;
+  }
+  /* Loading */
+  #loading { display: none; text-align: center; padding: 40px 20px; }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 4px solid #e2e8f0;
+    border-top-color: var(--green);
+    border-radius: 50%;
+    margin: 0 auto 16px;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* Result */
+  #result { display: none; }
+  .verdict {
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .verdict.healthy { background: #ecfdf5; border: 1px solid #6ee7b7; }
+  .verdict.scab { background: #fff7ed; border: 1px solid #fdba74; }
+  .verdict .label { font-size: 1.35rem; font-weight: 700; margin-bottom: 6px; }
+  .verdict.healthy .label { color: var(--green); }
+  .verdict.scab .label { color: var(--amber); }
+  .verdict .conf { font-size: 0.92rem; color: var(--muted); margin-bottom: 10px; }
+  .conf-bar {
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+  .conf-fill { height: 100%; border-radius: 999px; }
+  .verdict.healthy .conf-fill { background: var(--green); }
+  .verdict.scab .conf-fill { background: var(--amber); }
+  .advice h3 { font-size: 1.05rem; margin-bottom: 10px; }
+  .advice p { line-height: 1.6; font-size: 0.95rem; color: #334155; }
+  .reset-row { text-align: center; margin-top: 20px; }
+  #api-error {
+    display: none;
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #b91c1c;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    font-size: 0.92rem;
+    text-align: center;
+  }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Apple Scab Detector</h1>
+    <p class="tagline">Upload a leaf photo — get a scab diagnosis</p>
+    <span class="badge">ConvNeXt-Tiny · scab vs healthy</span>
+  </header>
+
+  <div id="api-error"></div>
+
+  <div class="card" id="upload-card">
+    <!-- Drop zone (initial state) -->
+    <div id="dropzone">
+      <div class="icon">🍃</div>
+      <p class="main">Drag &amp; drop a leaf photo here, or click to browse</p>
+      <p class="sub">JPG · PNG · WebP, max 10 MB</p>
+      <p id="dz-error"></p>
+    </div>
+    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp">
+
+    <!-- Preview (after file select) -->
+    <div id="preview-wrap">
+      <img id="preview-img" alt="Leaf preview">
+      <p id="filename"></p>
+      <div>
+        <button class="btn btn-primary" id="analyze-btn">Analyze leaf</button>
+        <button class="btn-text" id="remove-btn">Remove</button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <p>Analyzing leaf…</p>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div id="result">
+    <div class="card">
+      <div class="verdict" id="verdict">
+        <div class="label" id="verdict-label"></div>
+        <div class="conf" id="verdict-conf"></div>
+        <div class="conf-bar"><div class="conf-fill" id="conf-fill"></div></div>
+      </div>
+      <div class="advice">
+        <h3>What to do</h3>
+        <p id="advice-text"></p>
+      </div>
+      <div class="reset-row">
+        <button class="btn btn-primary" id="reset-btn">Check another leaf</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Trained on lab-condition PlantVillage photos — proves the pipeline, not orchard performance. Informational output, not agronomic advice.
+  </footer>
+
+</div>
+
+<script>
+(function() {
+  var dropzone = document.getElementById('dropzone');
+  var fileInput = document.getElementById('file-input');
+  var previewWrap = document.getElementById('preview-wrap');
+  var previewImg = document.getElementById('preview-img');
+  var filenameEl = document.getElementById('filename');
+  var dzError = document.getElementById('dz-error');
+  var analyzeBtn = document.getElementById('analyze-btn');
+  var removeBtn = document.getElementById('remove-btn');
+  var loadingEl = document.getElementById('loading');
+  var resultEl = document.getElementById('result');
+  var uploadCard = document.getElementById('upload-card');
+  var apiError = document.getElementById('api-error');
+  var currentFile = null;
+
+  var VALID_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  var MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+
+  function showDzError(msg) {
+    dzError.textContent = msg;
+    dzError.style.display = 'block';
+    dropzone.classList.add('error');
+  }
+  function clearDzError() {
+    dzError.style.display = 'none';
+    dropzone.classList.remove('error');
+  }
+  function showApiError(msg) {
+    apiError.textContent = msg;
+    apiError.style.display = 'block';
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+  function clearApiError() {
+    apiError.style.display = 'none';
+  }
+
+  function validateFile(file) {
+    if (VALID_TYPES.indexOf(file.type) === -1) {
+      return 'Please choose a JPG, PNG or WebP image.';
+    }
+    if (file.size > MAX_SIZE) {
+      return 'File is too large — max 10 MB.';
+    }
+    return null;
+  }
+
+  function handleFile(file) {
+    clearDzError(); clearApiError();
+    var err = validateFile(file);
+    if (err) { showDzError(err); return; }
+    currentFile = file;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      previewImg.src = e.target.result;
+      filenameEl.textContent = file.name;
+      dropzone.style.display = 'none';
+      previewWrap.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function resetAll() {
+    currentFile = null;
+    fileInput.value = '';
+    previewImg.src = '';
+    previewWrap.style.display = 'none';
+    dropzone.style.display = 'block';
+    loadingEl.style.display = 'none';
+    resultEl.style.display = 'none';
+    uploadCard.style.display = 'block';
+    clearDzError(); clearApiError();
+  }
+
+  // Drop zone interactions
+  dropzone.addEventListener('click', function() { fileInput.click(); });
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files.length) handleFile(fileInput.files[0]);
+  });
+  ['dragenter', 'dragover'].forEach(function(evt) {
+    dropzone.addEventListener(evt, function(e) {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function(evt) {
+    dropzone.addEventListener(evt, function(e) {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+    });
+  });
+  dropzone.addEventListener('drop', function(e) {
+    var dt = e.dataTransfer;
+    if (dt.files && dt.files.length) handleFile(dt.files[0]);
+  });
+
+  removeBtn.addEventListener('click', resetAll);
+  document.getElementById('reset-btn').addEventListener('click', resetAll);
+
+  analyzeBtn.addEventListener('click', async function() {
+    if (!currentFile) return;
+    clearApiError();
+    dropzone.style.display = 'none';
+    previewWrap.style.display = 'none';
+    loadingEl.style.display = 'block';
+
+    var fd = new FormData();
+    fd.append('file', currentFile);
+
+    try {
+      var r = await fetch('/predict', {method: 'POST', body: fd});
+      if (r.status === 400) {
+        showApiError('Please upload a clear JPG/PNG photo of a leaf.');
+        loadingEl.style.display = 'none';
+        previewWrap.style.display = 'block';
+        return;
+      }
+      if (r.status === 503) {
+        showApiError('Model not loaded on server. Please try again later.');
+        loadingEl.style.display = 'none';
+        previewWrap.style.display = 'block';
+        return;
+      }
+      if (!r.ok) {
+        showApiError('Something went wrong. Please try again.');
+        loadingEl.style.display = 'none';
+        previewWrap.style.display = 'block';
+        return;
+      }
+      var data = await r.json();
+      showResult(data);
+    } catch (e) {
+      showApiError('Network error. Check your connection and retry.');
+      loadingEl.style.display = 'none';
+      previewWrap.style.display = 'block';
+    }
+  });
+
+  function showResult(data) {
+    var verdict = document.getElementById('verdict');
+    var label = document.getElementById('verdict-label');
+    var conf = document.getElementById('verdict-conf');
+    var fill = document.getElementById('conf-fill');
+    var pct = Math.round(data.confidence * 100);
+
+    if (data.label === 'scab') {
+      verdict.className = 'verdict scab';
+      label.textContent = 'Apple scab detected';
+    } else {
+      verdict.className = 'verdict healthy';
+      label.textContent = 'Healthy leaf';
+    }
+    conf.textContent = pct + '% confidence';
+    fill.style.width = pct + '%';
+    document.getElementById('advice-text').textContent = data.advice || '';
+
+    loadingEl.style.display = 'none';
+    uploadCard.style.display = 'none';
+    resultEl.style.display = 'block';
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+})();
+</script>
+</body>
+</html>
