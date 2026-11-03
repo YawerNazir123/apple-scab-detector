@@ -1,22 +1,19 @@
 """Download the trained weights for apple-scab-detector.
 
-The 55.7 MB checkpoint lives on Kaggle (public dataset
+The 54 MB checkpoint lives on Hugging Face (public model repo
 ``yawarnazir/apple-scab-detector-model``) instead of in git. Run once:
 
     python download_model.py
 
-It downloads the dataset zip and extracts ``best_checkpoint.pth``,
-``classes.json`` and ``metrics.json`` into ``outputs/``. Stdlib only —
-no Kaggle account or API key needed (the dataset is public).
+It downloads ``best_checkpoint.pth``, ``classes.json`` and
+``metrics.json`` into ``outputs/``. Stdlib only — no Hugging Face
+account or API token needed (the repo is public).
 """
-import shutil
-import tempfile
 import urllib.request
-import zipfile
 from pathlib import Path
 
-DATASET = "yawarnazir/apple-scab-detector-model"
-URL = f"https://www.kaggle.com/api/v1/datasets/download/{DATASET}"
+HF_REPO = "yawarnazir/apple-scab-detector-model"
+BASE_URL = f"https://huggingface.co/{HF_REPO}/resolve/main"
 FILES = ["best_checkpoint.pth", "classes.json", "metrics.json"]
 
 
@@ -27,18 +24,13 @@ def main():
     if not missing:
         print("outputs/ already complete:", ", ".join(FILES))
         return
-    print(f"downloading {DATASET} (~56 MB) ...")
-    with tempfile.TemporaryDirectory() as tmp:
-        zpath = Path(tmp) / "model.zip"
-        urllib.request.urlretrieve(URL, zpath)
-        with zipfile.ZipFile(zpath) as z:
-            z.extractall(tmp)
-        for f in missing:
-            hits = [p for p in Path(tmp).rglob(f) if p.is_file()]
-            if not hits:
-                raise RuntimeError(f"{f} not found in downloaded dataset")
-            shutil.copy2(hits[0], out / f)
-            print("saved", out / f)
+    print(f"downloading {len(missing)} file(s) from Hugging Face repo {HF_REPO} ...")
+    for f in missing:
+        url = f"{BASE_URL}/{f}"
+        dest = out / f
+        print(f"downloading {f} ...")
+        urllib.request.urlretrieve(url, dest)
+        print("saved", dest)
     print("done.")
 
 
