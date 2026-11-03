@@ -1,0 +1,10 @@
+services:
+  scab-api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./outputs:/app/outputs:ro
+    environment:
+      - SCAB_CKPT=/app/outputs/best_checkpoint.pth
+    restart: unless-stopped
